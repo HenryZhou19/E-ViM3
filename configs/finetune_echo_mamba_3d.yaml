@@ -1,0 +1,121 @@
+config:  # main config (in this file) overrides additional configs
+  additional: [default_shared, default_train]  # add additional config file names, e.g. [default_xxx] --- the order matters (later ones overwrite previous ones)
+
+info:
+  output_dir: ./outputs/echo_dynamic_mamba_3d
+  project_name: dynamic-analysis-mamba-vit
+  wandb:
+    wandb_watch_model: False
+
+data:
+  dataset: echo_dynamic  # XXX: !!!
+  data_dir: ECHONET-DYNAMIC_DATA_DIR
+  # split_rate: 0.8
+  target_types: ['EF']
+  resize_to: 112
+  in_channels: 1
+  mean: null
+  std: null
+  length: 64  # total frames per input
+  period: 2  # sample interval
+  # val_period: 4
+  max_choice_num: 1  # for period == -1 only
+  train_pad: 12
+  train_time_pad: 0  # 15 for 32 in 256
+  gaussian_blur: False
+  median_blur: False
+  trainset_keep_ratio: 1.0
+  trainset_augmentation: False
+  mixup: False
+
+env:
+  num_workers: 16
+  prefetch_factor: 2
+  amp:
+    amp_mode: 'bf16'  # 'bf16', 'fp16'
+
+model:
+  model_choice: echo_dynamic_video_mamba_3d
+  ema:
+    ema_enabled: True
+    ema_update_every: 5
+  time_patch_size: 1
+  patch_size: 16
+  embed_dim: 384
+  l_reg_num: 1
+  h_reg_num: 1
+  w_reg_num: 1
+  n_mamba_per_block: 1
+  mamba_block_type: mamba  # mamba, mamba2
+  new_scan: True  # XXX
+  macro_block_num: 6
+  mamba_3d_forward_type: serial  # serial, parallel
+  extra_blocks_on_global: 0  # XXX
+  final_aggregate_mode: all_concat  # all_mean, all_max, all_concat
+  final_dim: 512
+  head_layers: 3
+
+criterion:
+  criterion_choice: echo_dynamic  # default as 'model.model_choice'
+  loss: mse
+  # loss: l1
+  # loss: smooth_l1
+  smooth_l1_beta: 4.0
+  softloss_tolerance: 0.0
+  primary_criterion: L1_loss  # null (None) to use loss as primary_criterion
+  primary_criterion_higher_better: False  # XXX: important for choosing best model
+
+trainer:
+  ## batch_control
+  trainer_batch_size_per_rank: 4
+  sync_lr_with_batch_size: 32  # XXX: if > 0, sync lr with batchsize (lr_real = lr_config * batch_size_total[all_ranks, grad_accumulation] / sync_lr_with_batch_size)
+  grad_accumulation: 4  # positive integer (keep it '1' in most cases)
+  ## batch_control ends
+  trainer_choice: echo_dynamic_simple_fuser
+  resume: null  # if setting to an existing cfg.yaml, make sure critical params(model, data, optimizer, scheduler, ...) are the same
+  pretrained_models:  # None or a dict of pretrained models {name1: path1, name2: path2, ...}
+    pretrained_video_mamba_3d_model: null  # XXX
+  load_from_ema: False  # XXX
+  freeze_modules: []  # [submodule_name1, submodule_name2, ...]
+  epochs: 50
+  optimizer:
+    optimizer_choice: adamw  # adamw, sgd
+    adamw_eps: 1.0e-15
+    sgd_momentum: 0.9
+    lr_default: 1.0e-4
+    wd_default: 1.0e-1
+    # param_groups:
+    #   lr_backbone: 4.0e-4
+    #   wd_backbone: 1.0e-2
+    #   lr_head: 1.0e-4
+    #   wd_head: 1.0e-4
+  scheduler:
+    scheduler_choice: cosine  # multistep, cosine, linear, cosine_restart
+    lr_milestones_epochs: [10, 20] # only for scheduler_choice == 'multistep' [50, 100]
+    lr_milestones_steps: null # only for scheduler_choice == 'multistep', if lr_milestones_steps is not None, override lr_milestones_epochs
+    lr_decay_gamma: 0.1  # only for scheduler_choice == 'multistep'
+    lr_first_cycle_epochs: 10  # only for scheduler_choice == 'cosine_restart'
+    lr_first_cycle_steps: null  # only for scheduler_choice == 'cosine_restart'
+    lr_cycle_mult: 1.0  # only for scheduler_choice == 'cosine_restart'
+    lr_cycle_gamma: 1.0  # only for scheduler_choice == 'cosine_restart'
+    warmup_epochs: 1
+    warmup_steps: -1  # if warmup_steps >= 0, override warmup_epochs
+    lr_min_factor: 0.01  # lr_min = lr_default * lr_min_factor
+    # warmup_type: linear  # default
+  max_grad_norm: 1.0  # <= 0 means no gradient clipping
+  min_hold_memory_mb: 0
+
+sweep:
+  sweep_enabled: True
+  sweep_params:  # use '//' as the connector for sub-params
+    # data//trainset_keep_ratio: [1.0, 0.1]
+    # trainer//scheduler//warmup_epochs: [1, 10]
+    # trainer//epochs: [50, 500]
+    # data//trainset_keep_ratio: [0.01]
+    # trainer//scheduler//warmup_epochs: [100]
+    # trainer//epochs: [5000]
+    # trainer//eval_freq: [10]
+    trainer//pretrained_models//pretrained_video_mamba_3d_model:
+    - null
+    - CHECKPOINT_PATH
+  # sweep_skip_indices: [1, 2, 3, 4, 5, 6]  # skip some indices in the sweep
