@@ -110,12 +110,12 @@ sweep:
   sweep_params:  # use '//' as the connector for sub-params
     # data//trainset_keep_ratio: [1.0, 0.1]
     # trainer//scheduler//warmup_epochs: [1, 10]
-    # trainer//epochs: [50, 500]
+    trainer//epochs: [50]
     # data//trainset_keep_ratio: [0.01]
     # trainer//scheduler//warmup_epochs: [100]
     # trainer//epochs: [5000]
     # trainer//eval_freq: [10]
-    trainer//pretrained_models//pretrained_video_mamba_3d_model:
-    - null
-    - CHECKPOINT_PATH
+    # trainer//pretrained_models//pretrained_video_mamba_3d_model:
+    # - null
+    # - CHECKPOINT_PATH
   # sweep_skip_indices: [1, 2, 3, 4, 5, 6]  # skip some indices in the sweep

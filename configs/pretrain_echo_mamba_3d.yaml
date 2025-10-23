@@ -105,5 +105,6 @@ trainer:
 sweep:
   sweep_enabled: True
   sweep_params:  # use '//' as the connector for sub-params
-    model//embed_dim: [96, 192, 384, 768] 
+    # model//embed_dim: [96, 192, 384, 768] 
+    model//embed_dim: [384] 
   # sweep_skip_indices: [0, 1]  # skip some indices in the sweep
