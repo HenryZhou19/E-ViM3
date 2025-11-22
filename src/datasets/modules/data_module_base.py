@@ -129,6 +129,7 @@ class DataModuleBase:
             worker_seed = rank_seed + worker_id
             random.seed(worker_seed)
             np.random.seed(worker_seed)
+            torch.manual_seed(worker_seed)
         return partial(_worker_init_fn, rank_seed=self.cfg.seed_base + self.cfg.env.num_workers * DistMisc.get_rank())
     
     def get_sampler(self, dataset: Dataset, is_training: bool, use_dist_sampler: bool) -> Sampler:
@@ -153,6 +154,7 @@ class DataLoaderX(DataLoader):
         super().__init__(*args, **kwargs)
         self.init_args = args
         self.init_kwargs = kwargs
+        self._current_epoch = -1
         
     def reinit_batch_size(self, batch_size):
         if 'batch_size' in self.init_kwargs:
@@ -163,8 +165,7 @@ class DataLoaderX(DataLoader):
     
     def sampler_set_epoch(self, epoch):
         self._current_epoch = epoch
-        
-        if self.sampler is not None:
+        if self.sampler is not None and hasattr(self.sampler, 'set_epoch'):
             self.sampler.set_epoch(self._current_epoch)
             
 
@@ -197,17 +198,17 @@ class _InfiniteSampler:
             
 
 class FixedLengthSampler:
-    def __init__(self, raw_sampler_list, required_length):
-        self.raw_sampler_list = raw_sampler_list
+    def __init__(self, raw_index_list, required_length):
+        self.raw_index_list = raw_index_list
         self.required_length = required_length
         self._check_length()
         
     def _check_length(self):
-        total_length = sum(map(len, self.raw_sampler_list))
+        total_length = len(self.raw_index_list)
         assert total_length >= self.required_length, f'total_length {total_length} < required_length {self.required_length}'
         
     def __iter__(self):
-        return itertools.islice(itertools.chain(*self.raw_sampler_list), self.required_length)
+        return itertools.islice(iter(self.raw_index_list), self.required_length)
     
     def __len__(self):
         return self.required_length
@@ -231,15 +232,24 @@ class FixedLengthDataLoaderX(DataLoaderX):
     
     @property
     def _index_sampler(self):
-        raw_index_sampler = self._raw_index_sampler
-        len_raw_index_sampler = len(raw_index_sampler)
-        
-        raw_index_sampler_list = [raw_index_sampler]
+        len_raw_index_sampler = len(self._raw_index_sampler)
+        raw_index_list = list(self._raw_index_sampler)
         now_length = len_raw_index_sampler
         
         while now_length < self._total_batches_one_epoch:
             self.sampler_set_epoch(self._current_epoch + self._total_epochs)
-            raw_index_sampler_list.append(self._raw_index_sampler)
+            raw_index_list.extend(list(self._raw_index_sampler))
             now_length += len_raw_index_sampler
     
-        return FixedLengthSampler(raw_index_sampler_list, self._total_batches_one_epoch)
+        return FixedLengthSampler(raw_index_list, self._total_batches_one_epoch)
+    
+
+class EmptyDataLoader:
+    def __init__(self, *args, **kwargs):
+        pass
+    
+    def __iter__(self):
+        return iter([])
+    
+    def __len__(self):
+        return 0
