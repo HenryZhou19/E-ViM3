@@ -1,6 +1,8 @@
 ## Mamba-3D as Masked Autoencoders for Accurate and Data-Efficient Analysis of Medical Ultrasound Videos
 ### This repository is built based on [Pytorch Template v1.5](https://github.com/HenryZhou19/Pytorch-Template/tree/v1.5_archive).
 
+> [!NOTE]
+> **Paper Update (November 2026):** The extended version of our [BIBM 2025 paper](https://ieeexplore.ieee.org/abstract/document/11356837) is now available as [arXiv paper (latest version)](https://arxiv.org/abs/2503.20258), featuring further refinements, additional experimental content, and corrections to numerical entries for comparison methods in Table 3.
 
 ## 🚀 Easy Start
 ### Create a new Python environment and install the requirements
